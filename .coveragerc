@@ -1,0 +1,18 @@
+[run]
+# 覆盖率配置
+source = src
+omit = 
+    tests/*
+    examples/*
+    */site-packages/*
+    */__pycache__/*
+
+[report]
+# 报告配置
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
