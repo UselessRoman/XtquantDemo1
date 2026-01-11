@@ -19,8 +19,12 @@ def example_1_basic_trading():
     print("示例1：基本交易操作")
     print("=" * 60)
     
+    # 配置参数（请根据实际情况修改）
+    qmt_path = r'E:\国金QMT交易端模拟\userdata_mini'
+    account_id = '8880835625'
+    
     # 创建交易接口
-    trader = Trader()
+    trader = Trader(qmt_path=qmt_path, account_id=account_id)
     
     # 连接交易接口
     if not trader.connect():

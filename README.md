@@ -2,22 +2,44 @@
 
 基于迅投量化（XTquant）的完整量化交易框架，包含数据管理、技术分析、策略开发、回测和实盘交易功能。
 
+---
+
+## 📑 目录
+
+- [核心特性](#核心特性)
+- [快速开始](#快速开始)
+- [项目结构](#项目结构)
+- [功能模块详解](#功能模块详解)
+- [使用示例](#使用示例)
+- [API 接口说明](#api-接口说明)
+- [配置说明](#配置说明)
+- [测试指南](#测试指南)
+- [开发指南](#开发指南)
+- [版本管理与发布](#版本管理与发布)
+- [版本历史](#版本历史)
+- [注意事项](#注意事项)
+- [贡献指南](#贡献指南)
+
+---
+
 ## ✨ 核心特性
 
 - 📊 **数据管理**：行情数据下载、财务数据获取、本地缓存
-- 📈 **技术分析**：MA、MACD、KDJ等技术指标计算和图表绘制
-- 📉 **财务分析**：PE、PB、ROE等财务指标评分
+- 📈 **技术分析**：MA、MACD、KDJ 等技术指标计算和图表绘制
+- 📉 **财务分析**：PE、PB、ROE 等财务指标评分
 - 🎯 **智能选股**：基于技术+财务的多维度选股
 - 🤖 **策略回测**：完整的回测引擎和性能分析
 - 💹 **实盘交易**：异步交易、实时监控、自动交易
 - 📡 **实时监控**：订单生命周期跟踪、成交记录、统计分析
 
+---
+
 ## 🚀 快速开始
 
 ### 环境要求
 
-1. **安装迅投MiniQMT客户端**：xtquant需要连接MiniQMT客户端才能使用
-2. **启动MiniQMT**：运行代码前必须先启动MiniQMT客户端并登录
+1. **安装迅投 MiniQMT 客户端**：xtquant 需要连接 MiniQMT 客户端才能使用
+2. **启动 MiniQMT**：运行代码前必须先启动 MiniQMT 客户端并登录
 3. **Python 3.8+**
 
 ### 安装依赖
@@ -50,6 +72,8 @@ strategy = MACDStrategy()
 result = framework.run_backtest('002352.SZ', strategy, '1d', '20240101', '20241231')
 ```
 
+---
+
 ## 📁 项目结构
 
 ```
@@ -75,24 +99,32 @@ XTquantdemo1/
 │   └── core/                     # 核心模块
 │       ├── config.py             # 配置管理
 │       └── utils.py              # 工具函数
-├── examples/                     # 示例代码
-│   ├── main.py                   # 框架主程序
-│   ├── example.py                # 基本使用示例
+├── examples/                     # 示例代码目录
+│   ├── main.py                   # QuantFramework 主类
+│   ├── complete_example.py       # 完整功能示例（推荐）
+│   ├── data_example.py           # 数据管理示例
+│   ├── analysis_example.py       # 分析功能示例
+│   ├── strategy_example.py       # 策略功能示例
+│   ├── backtest_example.py       # 回测功能示例
+│   ├── stock_selection_example.py # 选股功能示例
 │   ├── trade_example.py          # 交易功能示例
 │   ├── async_trade_monitor_example.py # 异步交易+监控示例
-│   └── stock_selection_example.py # 选股功能示例
+│   └── README.md                 # 示例说明文档
 ├── tests/                        # 测试代码
 ├── run_tests.py                  # 测试运行脚本
 ├── pytest.ini                    # Pytest配置
 ├── .coveragerc                   # 覆盖率配置
-└── requirements.txt              # 依赖包列表
+├── requirements.txt              # 依赖包列表
+└── README.md                     # 本文件
 ```
 
-## 📚 模块详细说明
+---
 
-### 数据模块 (`src/data/`)
+## 📚 功能模块详解
 
-#### 行情数据管理
+### 1. 数据模块 (`src/data/`)
+
+#### 1.1 行情数据管理
 
 ```python
 from src.data.market_data import MarketDataManager
@@ -105,16 +137,16 @@ manager.download_history_data('002352.SZ', '1d', '20240101', '20241231')
 # 获取本地数据
 data = manager.get_local_data('002352.SZ', '1d', '20240101', '20241231')
 
-# 增量更新数据（使用incrementally参数，自动从最后一条数据往后下载）
+# 增量更新数据（自动从最后一条数据往后下载）
 manager.update_data('002352.SZ', '1d')
 
 # 批量下载
 results = manager.batch_download(['002352.SZ', '000001.SZ'], '1d', '20240101', '20241231')
 ```
 
-**注意**：xtquant会自动管理数据存储，数据存储在MiniQMT安装目录下，无需手动指定路径。
+**注意**：xtquant 会自动管理数据存储，数据存储在 MiniQMT 安装目录下，无需手动指定路径。
 
-#### 财务数据管理
+#### 1.2 财务数据管理
 
 ```python
 from src.data.financial_data import FinancialDataManager
@@ -122,10 +154,12 @@ from src.data.financial_data import FinancialDataManager
 manager = FinancialDataManager()
 
 # 获取财务数据（如果本地没有会自动下载）
-financial_data = manager.get_financial_data('002352.SZ')
+financial_data = manager.get_financial_data('002352.SZ', auto_download=True)
 
 # 手动下载财务数据
-manager.download_financial_data(['600000.SH', '000001.SZ'], start_time='20200101', end_time='20241231')
+manager.download_financial_data(['600000.SH', '000001.SZ'], 
+                                 start_time='20200101', 
+                                 end_time='20241231')
 
 # 批量获取财务数据
 all_data = manager.batch_get_financial_data(['002352.SZ', '000001.SZ'])
@@ -137,9 +171,51 @@ all_data = manager.batch_get_financial_data(['002352.SZ', '000001.SZ'])
 - 从 `Balance` 表获取：总资产、总负债、股东权益等
 - 从市场数据获取：PE、PB、市值（需要实时价格计算）
 
-### 分析模块 (`src/analysis/`)
+#### 1.3 财务数据接口详解
 
-#### 技术指标分析
+**三种财务数据函数的区别**：
+
+| 函数 | 操作类型 | 数据来源 | 时间筛选 | 执行方式 |
+|------|---------|---------|---------|---------|
+| `get_financial_data()` | 读取 | 本地已下载数据 | ✅ 支持 | 立即返回 |
+| `download_financial_data()` | 下载 | 服务器全部数据 | ❌ 不支持 | 同步阻塞 |
+| `download_financial_data2()` | 下载 | 服务器指定范围 | ✅ 支持 | 同步阻塞 |
+
+**推荐工作流程**：
+```python
+# 方式1：自动下载并获取（推荐）
+data = manager.get_financial_data('600000.SH', auto_download=True)
+
+# 方式2：手动下载后获取
+manager.download_financial_data(['600000.SH'], start_time='20200101', end_time='20241231')
+data = manager.get_financial_data('600000.SH', auto_download=False)
+```
+
+#### 1.4 行情数据使用指南
+
+**订阅行情 vs 获取行情数据**：
+
+- **订阅行情（Subscribe Quote）**：实时推送，事件驱动，适用于实时监控（本项目未实现）
+- **获取行情数据（Get Market Data）**：主动获取，批量处理，适用于历史数据分析和回测（本项目使用）
+
+**使用决策流程**：
+```
+需要数据 → 是否实时？
+    │
+    ├─ 是 → 是否需要持续监控？
+    │      ├─ 是 → 使用 subscribe_quote()（未实现）
+    │      └─ 否 → 使用 get_market_data()
+    │
+    └─ 否 → 是否需要历史数据？
+             ├─ 是 → download_history_data() + get_local_data()
+             └─ 否 → get_market_data()
+```
+
+---
+
+### 2. 分析模块 (`src/analysis/`)
+
+#### 2.1 技术指标分析
 
 ```python
 from src.analysis.technical import TechnicalIndicators, ChartPlotter
@@ -159,7 +235,7 @@ plotter = ChartPlotter()
 fig, axes = plotter.create_chart(data, indicators, '002352.SZ')
 ```
 
-#### 财务指标分析
+#### 2.2 财务指标分析
 
 ```python
 from src.analysis.fundamental import FundamentalAnalyzer
@@ -177,7 +253,9 @@ filtered = analyzer.filter_financial_data(financial_data, {
 })
 ```
 
-### 策略模块 (`src/strategy/`)
+---
+
+### 3. 策略模块 (`src/strategy/`)
 
 ```python
 from src.strategy.strategies import (
@@ -200,7 +278,9 @@ combined = CombinedStrategy(
 )
 ```
 
-### 回测模块 (`src/backtest/`)
+---
+
+### 4. 回测模块 (`src/backtest/`)
 
 ```python
 from src.backtest.engine import BacktestEngine
@@ -221,7 +301,9 @@ performance = analyzer.analyze(result)
 analyzer.plot_equity_curve(result)
 ```
 
-### 选股模块 (`src/selection/`)
+---
+
+### 5. 选股模块 (`src/selection/`)
 
 ```python
 from src.selection.selector import StockSelector
@@ -247,18 +329,19 @@ result = selector.select_stocks(
 selector.save_selection_result(result, 'selected_stocks.csv')
 ```
 
-### 交易模块 (`src/trading/`)
+---
 
-#### 基础交易接口
+### 6. 交易模块 (`src/trading/`)
+
+#### 6.1 基础交易接口
 
 ```python
 from src.trading.trader import Trader
 
-# 创建交易接口（自动启用监控）
+# 创建交易接口
 trader = Trader(
     qmt_path=r'D:\qmt\...\userdata',  # QMT路径
-    account_id='2000128',              # 账户ID
-    use_monitor=True                   # 启用实时监控
+    account_id='2000128'               # 账户ID
 )
 
 # 连接交易接口
@@ -271,7 +354,7 @@ account_info = trader.get_account_info()
 positions = trader.get_positions()
 ```
 
-#### 异步交易（推荐）
+#### 6.2 异步交易（推荐）
 
 ```python
 # 异步买入（默认，立即返回请求序号）
@@ -289,32 +372,38 @@ seq = trader.sell_all('600000.SH')
 order_id = trader.buy('600000.SH', price=10.5, quantity=10, async_mode=False)
 ```
 
-#### 实时监控
+#### 6.3 实时监控
 
 ```python
-# 监控器自动跟踪所有异步订单
+from src.trading.trade_monitor import TradeMonitor
+
+# 创建并注册监控器
+monitor = TradeMonitor()
+trader.trader.register_callback(monitor)
+
+# 异步交易后，监控器自动跟踪所有订单
 # 自动打印订单状态变化：
 # [监控] 📋 委托回报: 买入600000.SH | 订单100001 | 状态:已报
 # [监控] 💰 成交: 买入 600000.SH 10000股@10.50
 # [监控] 📋 委托回报: 买入600000.SH | 订单100001 | 状态:已成
 
 # 查看监控摘要
-trader.monitor.print_summary()
+monitor.print_summary()
 
 # 获取统计信息
-stats = trader.monitor.get_statistics()
+stats = monitor.get_statistics()
 
 # 查询订单状态
-status = trader.monitor.get_order_status(order_id)
+status = monitor.get_order_status(order_id)
 
 # 获取成交记录
-trades = trader.monitor.get_trade_records()
+trades = monitor.get_trade_records()
 
 # 导出数据
-dataframes = trader.monitor.export_to_dataframe()
+dataframes = monitor.export_to_dataframe()
 ```
 
-#### 自动交易
+#### 6.4 自动交易
 
 ```python
 from src.trading.auto_trader import AutoTrader
@@ -334,7 +423,41 @@ result = auto_trader.run_strategy(
 # 返回: {'success': True, 'signal': 1, 'async_seq': 12345}
 ```
 
-#### 自定义回调
+#### 6.5 交易接口说明：同步、异步和回调
+
+**同步（Synchronous）下单**：
+- ⏱️ **阻塞式**：调用后程序暂停，等待结果
+- ✅ **立即获得结果**：返回订单编号（order_id）
+- ⚠️ **可能等待较久**：如果网络延迟或服务器处理慢，会阻塞程序
+
+**异步（Asynchronous）下单（默认）**：
+- ⚡ **非阻塞式**：调用后立即返回，不等待结果
+- 📝 **返回请求序号**：返回 seq（序列号），用于追踪该请求
+- 🔔 **通过回调获取结果**：实际的成功/失败通过回调函数通知
+- 🚀 **高并发**：可以快速发送多个请求，不会阻塞
+
+**回调（Callback）机制**：
+- 🎯 **事件驱动**：当委托状态变化时自动触发
+- 🔄 **实时通知**：委托回报、成交变动、错误等实时推送
+- 📡 **被动接收**：不需要主动查询，系统主动推送
+
+**主要回调事件**：
+1. 委托回报回调 `on_stock_order`：委托状态变化时触发
+2. 成交回报回调 `on_stock_trade`：有成交时触发
+3. 异步下单响应回调 `on_order_stock_async_response`：异步下单的响应
+4. 错误回调 `on_order_error`：下单失败时触发
+
+**对比总结**：
+
+| 特性 | 同步 | 异步（默认） | 回调 |
+|------|------|------------|------|
+| 执行方式 | 阻塞等待 | 立即返回 | 自动触发 |
+| 返回值 | 订单编号 order_id | 请求序号 seq | 无返回值 |
+| 结果获取 | 立即获得 | 通过回调获取 | 实时推送 |
+| 性能 | 较慢（需等待） | 快（不等待） | 实时响应 |
+| 适用场景 | 单笔交易 | 批量交易、高频 | 实时监控 |
+
+#### 6.6 自定义回调
 
 ```python
 # 注册自定义回调函数
@@ -344,13 +467,17 @@ def on_order_confirmed(data):
 def on_order_traded(data):
     print(f"成交: {data['stock_code']} {data['volume']}股")
 
-trader.monitor.register_user_callback('on_order_confirmed', on_order_confirmed)
-trader.monitor.register_user_callback('on_order_traded', on_order_traded)
+monitor.register_user_callback('on_order_confirmed', on_order_confirmed)
+monitor.register_user_callback('on_order_traded', on_order_traded)
 ```
 
-## 📖 完整使用示例
+---
 
-### 示例1：数据下载 → 分析 → 回测
+## 💡 使用示例
+
+### 完整工作流程示例
+
+#### 示例1：数据下载 → 分析 → 回测
 
 ```python
 from examples.main import QuantFramework
@@ -372,17 +499,22 @@ result = framework.run_backtest('002352.SZ', strategy, '1d', '20240101', '202412
 print(result['performance'])
 ```
 
-### 示例2：异步交易 + 实时监控
+#### 示例2：异步交易 + 实时监控
 
 ```python
 from src.trading.trader import Trader
+from src.trading.trade_monitor import TradeMonitor
+import time
 
-# 创建交易接口（自动启用监控）
+# 创建交易接口
 trader = Trader(
     qmt_path=r'D:\qmt\投研\迅投极速交易终端睿智融科版\userdata',
-    account_id='2000128',
-    use_monitor=True
+    account_id='2000128'
 )
+
+# 创建并注册监控器
+monitor = TradeMonitor()
+trader.trader.register_callback(monitor)
 
 trader.connect()
 
@@ -392,13 +524,11 @@ seq2 = trader.buy('600519.SH', price=1800, quantity=1)
 
 # 监控器自动跟踪所有订单状态
 # 等待一段时间后查看摘要
-import time
 time.sleep(5)
-
-trader.monitor.print_summary()
+monitor.print_summary()
 ```
 
-### 示例3：选股 → 自动交易
+#### 示例3：选股 → 自动交易
 
 ```python
 from examples.main import QuantFramework
@@ -423,271 +553,97 @@ for idx, row in selected_stocks.iterrows():
     framework.run_auto_trading(stock_code, strategy, lookback_days=100)
 ```
 
-## 🔄 交易接口说明：同步、异步和回调
+### 示例文件说明
 
-### 1. 同步（Synchronous）下单/撤单
+查看 `examples/` 目录获取更多详细示例：
 
-**定义**：调用接口后，程序会**等待服务器响应**，直到收到结果才继续执行。
+- **`complete_example.py`** - 完整功能示例（推荐），包含所有核心功能的演示
+- **`data_example.py`** - 数据管理功能示例
+- **`analysis_example.py`** - 分析功能示例
+- **`strategy_example.py`** - 策略功能示例
+- **`backtest_example.py`** - 回测功能示例
+- **`stock_selection_example.py`** - 选股功能示例
+- **`trade_example.py`** - 交易功能示例
+- **`async_trade_monitor_example.py`** - 异步交易+实时监控示例
 
-**特点**：
-- ⏱️ **阻塞式**：调用后程序暂停，等待结果
-- ✅ **立即获得结果**：返回订单编号（order_id）或成功/失败状态
-- 🎯 **确定性**：调用完成后就知道是否成功
-- ⚠️ **可能等待较久**：如果网络延迟或服务器处理慢，会阻塞程序
+**运行示例**：
+```bash
+# 运行完整功能示例
+python examples/complete_example.py
 
-**适用场景**：
-- 需要立即知道下单是否成功的场景
-- 单笔交易操作，不需要高并发
-- 程序逻辑需要等待交易结果才能继续
-
-**示例**：
-```python
-# 同步下单：立即返回订单编号
-order_id = trader.buy('600000.SH', price=10.5, quantity=10, async_mode=False)
-# order_id > 0 表示成功，-1 表示失败
-
-# 同步撤单：立即返回结果
-result = trader.cancel_order(order_id, async_mode=False)
-# result == True 表示成功
+# 运行特定功能示例
+python examples/data_example.py
+python examples/strategy_example.py
 ```
 
----
-
-### 2. 异步（Asynchronous）下单/撤单
-
-**定义**：调用接口后，程序**立即返回**一个请求序号（seq），不等待服务器响应，继续执行后续代码。
-
-**特点**：
-- ⚡ **非阻塞式**：调用后立即返回，不等待结果
-- 📝 **返回请求序号**：返回 seq（序列号），用于追踪该请求
-- 🔔 **通过回调获取结果**：实际的成功/失败通过回调函数通知
-- 🚀 **高并发**：可以快速发送多个请求，不会阻塞
-
-**适用场景**：
-- 需要快速发送大量订单
-- 程序需要继续执行其他逻辑，不能等待
-- 高频交易场景
-- 实时监控和响应场景
-
-**示例**：
-```python
-# 异步下单：立即返回请求序号seq（默认模式）
-seq = trader.buy('600000.SH', price=10.5, quantity=10)
-# seq > 0 表示请求已提交，程序继续执行
-
-# 异步撤单：立即返回请求序号seq
-seq = trader.cancel_order(order_id, async_mode=True)
-```
+更多示例说明请参考 `examples/README.md`。
 
 ---
 
-### 3. 回调（Callback）机制
+## ⚙️ API 接口说明
 
-**定义**：系统在特定事件发生时，**自动调用**你定义的函数来通知你。
+### QuantFramework 主类
 
-**特点**：
-- 🎯 **事件驱动**：当委托状态变化时自动触发
-- 🔄 **实时通知**：委托回报、成交变动、错误等实时推送
-- 📡 **被动接收**：不需要主动查询，系统主动推送
-
-**主要回调事件**：
-1. **委托回报回调** `on_stock_order`：委托状态变化时触发
-2. **成交回报回调** `on_stock_trade`：有成交时触发
-3. **异步下单响应回调** `on_order_stock_async_response`：异步下单的响应
-4. **错误回调** `on_order_error`：下单失败时触发
-5. **撤单错误回调** `on_cancel_error`：撤单失败时触发
-
-**实现方式**：
-- 通过 `TradeMonitor` 类自动接收和处理所有回调
-- 可以注册自定义回调函数来扩展功能
-
----
-
-### 对比总结
-
-| 特性 | 同步 | 异步（默认） | 回调 |
-|------|------|------------|------|
-| **执行方式** | 阻塞等待 | 立即返回 | 自动触发 |
-| **返回值** | 订单编号 order_id | 请求序号 seq | 无返回值 |
-| **结果获取** | 立即获得 | 通过回调获取 | 实时推送 |
-| **性能** | 较慢（需等待） | 快（不等待） | 实时响应 |
-| **适用场景** | 单笔交易 | 批量交易、高频 | 实时监控 |
-| **错误处理** | 直接判断返回值 | 通过回调判断 | 通过回调判断 |
-
----
-
-### 项目中的实现
-
-在 `trader.py` 中，默认使用**异步模式**：
+`examples/main.py` 中的 `QuantFramework` 类整合了所有模块功能：
 
 ```python
-# 异步模式（默认）
-seq = trader.buy('600000.SH', price=10.5, quantity=10)
-# 返回请求序号 seq
+from examples.main import QuantFramework
 
-# 同步模式
-order_id = trader.buy('600000.SH', price=10.5, quantity=10, async_mode=False)
-# 返回订单编号 order_id
-```
+framework = QuantFramework(enable_trading=False, qmt_path=None, account_id=None)
 
-**建议**：
-- 对于大多数场景，使用**异步模式**（默认）性能更好
-- 如果必须立即知道结果，使用**同步模式**
-- 需要实时监控时，监控器会自动通过回调接收推送
+# 数据管理
+framework.download_data(stock_id, period, start_time, end_time)
+framework.update_data(stock_id, period)
+framework.get_data(stock_id, period, start_time, end_time)
 
----
+# 分析功能
+framework.analyze_data(stock_id, period, start_time, end_time, save_chart=True)
 
-## 📊 行情数据使用指南
+# 回测功能
+framework.run_backtest(stock_id, strategy, period, start_time, end_time, save_chart=True)
 
-### 订阅行情 vs 获取行情数据
+# 选股功能
+framework.select_stocks(financial_filters, technical_filters, min_total_score, max_results)
 
-#### 1. 订阅行情（Subscribe Quote）
-
-**特点**：
-- ✅ **实时推送**：数据会自动推送，无需主动查询
-- ✅ **事件驱动**：通过回调函数接收数据更新
-- ✅ **持续监控**：适用于实时监控多只股票
-- ✅ **低延迟**：数据到达后立即触发回调
-
-**适用场景**：
-- 实时监控股票价格变化
-- 实时交易决策（需要最新价格）
-- 实时行情监控系统
-- 高频策略执行
-
-**本项目使用情况**：目前主要用于历史数据分析和策略回测，**未实现订阅行情功能**。如需实时交易，可考虑添加。
-
-#### 2. 获取行情数据（Get Market Data）
-
-**特点**：
-- ✅ **主动获取**：需要主动调用API获取数据
-- ✅ **批量处理**：适合批量获取多只股票数据
-- ✅ **历史数据**：可以获取历史K线数据
-- ✅ **一次性返回**：调用后立即返回结果
-
-**适用场景**：
-- 历史数据分析
-- 策略回测
-- 批量选股
-- 技术指标计算
-- 一次性数据查询
-
-**本项目实现**：
-- ✅ `MarketDataManager.download_history_data()` - 下载历史数据
-- ✅ `MarketDataManager.get_local_data()` - 获取本地已下载数据
-- ✅ `MarketDataManager.update_data()` - 增量更新数据（使用 `incrementally=True`）
-
-#### 使用决策流程
-
-```
-需要数据 → 是否实时？
-    │
-    ├─ 是 → 是否需要持续监控？
-    │      │
-    │      ├─ 是 → 使用 subscribe_quote() 订阅行情（未实现）
-    │      │
-    │      └─ 否 → 使用 get_market_data() 获取快照
-    │
-    └─ 否 → 是否需要历史数据？
-             │
-             ├─ 是 → 先 download_history_data() 下载
-             │       再 get_local_data() 获取
-             │
-             └─ 否 → 使用 get_market_data() 获取当前数据
+# 交易功能（需要 enable_trading=True）
+framework.connect_trader()
+framework.get_account_info()
+framework.get_positions()
+framework.buy_stock(stock_code, price, quantity)
+framework.sell_stock(stock_code, price, quantity)
+framework.run_auto_trading(stock_code, strategy, period, lookback_days)
 ```
 
 ---
 
-## 💰 财务数据接口说明
+## 📝 配置说明
 
-### 三种财务数据函数的区别
+配置文件位于 `src/core/config.py`：
 
-xtquant 提供了三种财务数据相关的函数：
+### ChartConfig - 图表配置
+- 颜色、字体、布局设置
+- 技术指标参数（MA周期、MACD参数等）
 
-#### 1. `get_financial_data()` - 获取财务数据（从本地读取）
+### BacktestConfig - 回测配置
+- 初始资金：`INITIAL_CAPITAL = 100000.0`
+- 手续费率：`COMMISSION_RATE = 0.0001`（万1）
+- 滑点率：`SLIPPAGE_RATE = 0.001`（0.1%）
 
-**作用**：从**本地已下载**的财务数据中读取数据，**不会**从服务器下载新数据。
+### DataConfig - 数据配置
+- **注意**：xtquant 会自动管理数据存储，数据存储在 MiniQMT 安装目录下，不需要手动指定路径
+- 默认时间参数：`DEFAULT_START_DATE`、`DEFAULT_PERIOD`
 
-**特点**：
-- ✅ **只读操作**：不下载数据，仅读取本地数据
-- ✅ **速度快**：本地读取，无需网络请求
-- ✅ **支持时间筛选**：可以指定 `start_time` 和 `end_time`
-- ✅ **支持报表筛选**：可以选择按截止日期或披露日期筛选
-- ❌ **依赖本地数据**：如果本地没有数据，返回空结果
+### TradeConfig - 交易配置
+- **QMT_PATH**：QMT 客户端路径（需配置）
+- **ACCOUNT_ID**：资金账号（需配置）
+- **ACCOUNT_TYPE**：账户类型（'STOCK'/'CREDIT'/'FUTURE'）
+- 风险控制参数（最大持仓比例、单股比例等）
 
-**使用场景**：
-- 已经下载过数据，需要读取和分析
-- 快速查询已有的财务数据
-- 不需要更新数据时
-
-#### 2. `download_financial_data()` - 下载财务数据（简单版）
-
-**作用**：从服务器下载财务数据到本地，**同步执行**，下载完成后才返回。
-
-**特点**：
-- ✅ **下载操作**：从服务器下载数据到本地
-- ✅ **简单易用**：不需要指定时间范围，下载全部可用数据
-- ✅ **同步执行**：阻塞式，下载完成后才返回
-- ❌ **无时间控制**：无法指定下载的时间范围
-
-**使用场景**：
-- 首次下载数据，需要全部历史数据
-- 不需要时间范围控制时
-
-#### 3. `download_financial_data2()` - 下载财务数据（高级版）
-
-**作用**：从服务器下载财务数据到本地，支持时间范围筛选。
-
-**特点**：
-- ✅ **下载操作**：从服务器下载数据到本地
-- ✅ **时间控制**：可以指定 `start_time` 和 `end_time`（按披露日期筛选）
-- ✅ **同步执行**：阻塞式，下载完成后才返回
-
-**使用场景**：
-- 需要下载指定时间范围的数据
-- 需要增量更新数据时
-
-### 对比总结
-
-| 特性 | `get_financial_data()` | `download_financial_data()` | `download_financial_data2()` |
-|------|------------------------|----------------------------|------------------------------|
-| **操作类型** | 读取（从本地） | 下载（从服务器） | 下载（从服务器） |
-| **是否需要网络** | ❌ 否 | ✅ 是 | ✅ 是 |
-| **时间范围筛选** | ✅ 支持 | ❌ 不支持 | ✅ 支持 |
-| **执行方式** | 立即返回 | 同步（阻塞） | 同步（阻塞） |
-| **数据来源** | 本地已下载数据 | 服务器全部数据 | 服务器指定范围数据 |
-| **适用场景** | 读取已下载数据 | 首次下载全部数据 | 批量/增量下载 |
-
-### 推荐工作流程
-
-**方式1：自动下载并获取（推荐）**
-```python
-manager = FinancialDataManager()
-
-# 自动判断：如果本地没有数据则自动下载
-data = manager.get_financial_data('600000.SH', auto_download=True)
-```
-
-**方式2：手动下载后获取**
-```python
-# 1. 先下载数据
-manager.download_financial_data(
-    stock_list=['600000.SH'],
-    start_time='20200101',
-    end_time='20241231'
-)
-
-# 2. 然后获取数据
-data = manager.get_financial_data('600000.SH', auto_download=False)
-```
-
-**注意**：
-- 下载的数据会自动存储在 MiniQMT 安装目录下，无需手动管理
-- `download_financial_data2()` 的 `start_time` 和 `end_time` 是按**披露日期**（`m_anntime`）筛选的
+**重要**：使用交易功能前，请在 `config.py` 中配置 `QMT_PATH` 和 `ACCOUNT_ID`，或在创建 `Trader` 时传入参数。
 
 ---
 
-## 🧪 运行测试
+## 🧪 测试指南
 
 ### 方式1：使用 run_tests.py（推荐）
 
@@ -744,30 +700,7 @@ pytest --cov=src --cov-report=html
 start htmlcov/index.html  # Windows
 ```
 
-## 📝 配置说明
-
-配置文件位于 `src/core/config.py`：
-
-### ChartConfig - 图表配置
-- 颜色、字体、布局设置
-- 技术指标参数（MA周期、MACD参数等）
-
-### BacktestConfig - 回测配置
-- 初始资金：`INITIAL_CAPITAL = 100000.0`
-- 手续费率：`COMMISSION_RATE = 0.0001`（万1）
-- 滑点率：`SLIPPAGE_RATE = 0.001`（0.1%）
-
-### DataConfig - 数据配置
-- **注意**：xtquant会自动管理数据存储，数据存储在MiniQMT安装目录下，不需要手动指定路径
-- 默认时间参数：`DEFAULT_START_DATE`、`DEFAULT_PERIOD`
-
-### TradeConfig - 交易配置
-- **QMT_PATH**：QMT客户端路径（需配置）
-- **ACCOUNT_ID**：资金账号（需配置）
-- **ACCOUNT_TYPE**：账户类型（'STOCK'/'CREDIT'/'FUTURE'）
-- 风险控制参数（最大持仓比例、单股比例等）
-
-**重要**：使用交易功能前，请在 `config.py` 中配置 `QMT_PATH` 和 `ACCOUNT_ID`，或在创建 `Trader` 时传入参数。
+---
 
 ## 🔧 开发指南
 
@@ -802,35 +735,307 @@ def my_custom_callback(data):
     # 处理回调数据
     pass
 
-trader.monitor.register_user_callback('on_order_traded', my_custom_callback)
+monitor.register_user_callback('on_order_traded', my_custom_callback)
 ```
 
-## 🔍 更多示例
+---
 
-查看 `examples/` 目录获取更多示例：
+## 📦 版本管理与发布
 
-- `examples/example.py` - 基本使用示例（数据、分析、回测）
-- `examples/trade_example.py` - 交易功能示例（买卖、持仓管理）
-- `examples/async_trade_monitor_example.py` - 异步交易+实时监控示例
-- `examples/stock_selection_example.py` - 选股功能示例
-- `examples/main.py` - 完整框架集成示例
+### Git 配置
+
+首次使用需要配置 Git 用户信息：
+
+```bash
+git config --global user.name "你的用户名"
+git config --global user.email "你的邮箱@example.com"
+```
+
+### 上传项目到 GitHub
+
+#### 步骤1：初始化 Git 仓库
+
+```bash
+cd e:\XTquantdemo1
+git init
+```
+
+#### 步骤2：检查 .gitignore 文件
+
+确保 `.gitignore` 文件包含以下内容：
+- Python 缓存文件（`__pycache__/`, `*.pyc`）
+- 虚拟环境（`.venv/`, `venv/`）
+- IDE 配置（`.idea/`, `.vscode/`）
+- 测试覆盖率报告（`htmlcov/`, `.pytest_cache/`）
+- 日志文件（`*.log`）
+- 系统文件（`.DS_Store`, `Thumbs.db`）
+
+#### 步骤3：添加文件到 Git
+
+```bash
+# 查看要添加的文件（可选）
+git status
+
+# 添加所有文件到暂存区
+git add .
+
+# 创建首次提交
+git commit -m "Initial commit: XTquant量化交易框架"
+```
+
+#### 步骤4：在 GitHub 上创建新仓库
+
+1. 登录 GitHub (https://github.com)
+2. 点击右上角的 "+" 号，选择 "New repository"
+3. 填写仓库信息：
+   - **Repository name**: `XTquant-demo`（或其他你喜欢的名字）
+   - **Description**: `基于迅投量化(XTquant)的完整量化交易框架`
+   - **Visibility**: 选择 Public（公开）或 Private（私有）
+   - **不要**勾选 "Initialize this repository with a README"（因为本地已有文件）
+4. 点击 "Create repository"
+
+#### 步骤5：连接本地仓库到 GitHub
+
+**使用 HTTPS（推荐，简单）**：
+
+```bash
+# 添加远程仓库（替换为你的实际仓库地址）
+git remote add origin https://github.com/你的用户名/XTquant-demo.git
+
+# 验证远程仓库
+git remote -v
+```
+
+**使用 SSH（需要配置 SSH 密钥）**：
+
+```bash
+git remote add origin git@github.com:你的用户名/XTquant-demo.git
+```
+
+#### 步骤6：推送代码到 GitHub
+
+```bash
+# 推送代码（首次推送）
+git branch -M main
+git push -u origin main
+```
+
+### GitHub 认证说明
+
+**重要：GitHub 不再支持密码认证，必须使用 Personal Access Token (PAT)**
+
+#### 生成 Personal Access Token：
+
+1. 登录 GitHub
+2. 点击右上角头像 → **Settings**
+3. 左侧菜单滚动到底部 → **Developer settings**
+4. 点击 **Personal access tokens** → **Tokens (classic)**
+5. 点击 **Generate new token (classic)**
+6. 填写信息：
+   - **Note**: `XTquant项目上传`（描述用途）
+   - **Expiration**: 选择有效期（建议选择较长时间，如 90 天）
+   - **勾选权限**: 至少勾选 `repo`（完整仓库权限）
+7. 点击 **Generate token**
+8. **立即复制 token**（格式类似：`ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`）
+   - ⚠️ **注意**：token 只会显示一次，请立即保存！
+
+#### 使用 Token 推送代码：
+
+```bash
+# 推送时，系统会提示输入用户名和密码：
+Username: 你的GitHub用户名
+Password: 粘贴刚才复制的token（不是GitHub密码！）
+```
+
+#### 如果遇到 SSH 认证问题：
+
+可以切换到 HTTPS：
+```bash
+git remote set-url origin https://github.com/你的用户名/仓库名.git
+```
+
+### 后续更新代码
+
+当代码有更新时，使用以下命令：
+
+```bash
+# 查看更改
+git status
+
+# 添加更改的文件
+git add .
+
+# 提交更改
+git commit -m "描述你的更改"
+
+# 推送到 GitHub
+git push
+```
+
+### 常用 Git 命令
+
+```bash
+# 查看当前状态
+git status
+
+# 查看提交历史
+git log
+
+# 查看远程仓库
+git remote -v
+
+# 查看分支
+git branch
+
+# 拉取远程更新
+git pull
+
+# 创建新分支
+git checkout -b feature/新功能
+
+# 切换分支
+git checkout main
+```
+
+### 提交前检查清单
+
+1. **不要提交敏感信息**：
+   - API 密钥
+   - 密码
+   - 真实账户信息
+   - 本地配置文件中的敏感数据
+
+2. **.gitignore 已配置**：会自动排除：
+   - `__pycache__/` - Python 缓存
+   - `.venv/` - 虚拟环境
+   - `.pytest_cache/` - 测试缓存
+   - `htmlcov/` - 覆盖率报告
+   - `*.log` - 日志文件
+   - `.cursor/` - Cursor IDE 配置
+
+3. **建议提交前检查**：
+   ```bash
+   git status
+   git diff  # 查看具体更改内容
+   ```
+
+---
 
 ## ⚠️ 注意事项
 
 1. **交易风险**：实盘交易前请充分测试，建议先在模拟环境验证
-2. **数据依赖**：需要连接MiniQMT客户端，确保网络畅通
-3. **账户配置**：交易功能需要配置正确的QMT路径和账户ID
+2. **数据依赖**：需要连接 MiniQMT 客户端，确保网络畅通
+3. **账户配置**：交易功能需要配置正确的 QMT 路径和账户 ID
 4. **异步监控**：使用异步交易时，监控器会自动跟踪订单状态，建议等待回调确认后再进行下一步操作
-5. **数据存储**：xtquant会自动管理数据存储，数据存储在MiniQMT安装目录下，无需手动管理
+5. **数据存储**：xtquant 会自动管理数据存储，数据存储在 MiniQMT 安装目录下，无需手动管理
 6. **数据更新**：行情数据使用 `incrementally=True` 自动增量更新，财务数据需要手动调用下载函数更新
+
+---
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+### 贡献流程
+
+1. Fork 本项目
+2. 创建特性分支（`git checkout -b feature/新功能`）
+3. 提交更改（`git commit -m "添加新功能"`）
+4. 推送到分支（`git push origin feature/新功能`）
+5. 提交 Pull Request
+
+### 代码规范
+
+- 遵循 PEP 8 Python 代码规范
+- 添加适当的注释和文档字符串
+- 为新功能添加测试用例
+- 更新相关文档
+
+---
+
+## 📜 版本历史
+
+### v2.0.0 (2026-01-07)
+
+#### 重大更新
+- ✅ 重构项目结构，实现模块化设计
+- ✅ 整合所有文档到统一的 README.md
+- ✅ 完善示例代码组织结构
+
+#### 新增功能
+- ✅ 异步交易和实时监控功能
+- ✅ TradeMonitor 交易监控器
+- ✅ 完整的示例文件体系（每种功能独立示例文件）
+
+#### 改进
+- ✅ 优化数据管理模块
+- ✅ 完善财务数据接口使用
+- ✅ 改进错误处理和提示信息
+
+---
+
+### v1.0.0 (2026-01-05)
+
+#### 核心功能
+- ✅ 选股模块：基于技术+财务的多维度选股
+- ✅ 交易模块：同步/异步交易接口
+- ✅ 自动交易模块：根据策略信号自动执行
+- ✅ 测试框架：完整的 pytest 测试体系
+
+#### 选股功能 (2026-01-05)
+- ✅ 获取 A 股股票列表
+- ✅ 获取财务数据（PE、PB、ROE、净利润增长率等）
+- ✅ 计算技术指标得分（基于 MA、MACD、KDJ 等）
+- ✅ 计算财务指标得分（基于 PE、PB、ROE 等）
+- ✅ 综合选股（财务 60% + 技术 40%）
+- ✅ 多种选股策略（价值投资、成长投资等）
+- ✅ 选股结果保存
+
+#### 交易功能 (2026-01-05)
+- ✅ 交易接口连接和管理
+- ✅ 查询账户信息和持仓
+- ✅ 买入/卖出股票（支持限价单和市价单）
+- ✅ 撤单功能
+- ✅ 查询委托和成交记录
+- ✅ 卖出全部持仓功能
+- ✅ 根据策略信号自动执行交易
+- ✅ 自动计算交易数量（根据可用资金）
+- ✅ 持仓管理
+- ✅ 交易历史记录
+
+#### 测试功能 (2026-01-05)
+- ✅ 完整的 pytest 测试框架
+- ✅ 测试配置和 fixtures
+- ✅ 样本数据生成器
+- ✅ 工具函数测试
+- ✅ 配置模块测试
+- ✅ 数据分析模块测试
+- ✅ 策略模块测试
+- ✅ 回测模块测试
+- ✅ 集成测试
+
+#### 优化改进 (2026-01-05)
+- ✅ 修正了 `download_history_data()` 的返回值处理
+- ✅ 添加了数据下载后的验证机制
+- ✅ 改进了数据清理逻辑
+- ✅ 优化了索引转换（支持 YYYYMMDD 字符串格式和 DatetimeIndex）
+- ✅ 添加了数据有效性检查
+- ✅ 新增工具模块（日期格式化、股票代码验证等）
+- ✅ 改进了错误处理
+
+---
 
 ## 📄 许可证
 
 本项目仅供学习和研究使用。
 
-## 🤝 贡献
+---
 
-欢迎提交 Issue 和 Pull Request！
+## 📞 联系方式
+
+如有问题或建议，请通过以下方式联系：
+- 提交 Issue
+- 发送 Pull Request
 
 ---
 
