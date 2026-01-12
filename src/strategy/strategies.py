@@ -8,8 +8,13 @@
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from enum import Enum
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from src.selection.selector import MLStockSelector
 
 
 class Signal(Enum):
@@ -232,3 +237,81 @@ class RSIStrategy(SignalGenerator):
                 signals.iloc[i] = Signal.SELL.value
         
         return signals
+
+
+class MLMultiFactorStrategy(SignalGenerator):
+    """机器学习多因子策略：基于47因子+ML模型的策略"""
+    
+    def __init__(self, model_path: str, stock_num: int = 7, score_threshold: float = 0.61,
+                 rebalance_freq: str = 'monthly', rebalance_days: List[int] = [1, 15]):
+        """
+        初始化ML多因子策略
+        
+        Args:
+            model_path: 模型文件路径
+            stock_num: 持仓股票数量
+            score_threshold: 得分阈值
+            rebalance_freq: 调仓频率（'monthly'或'daily'）
+            rebalance_days: 调仓日期（每月几号），仅在rebalance_freq='monthly'时有效
+        """
+        self.selector = MLStockSelector(model_path, stock_num, score_threshold)
+        self.stock_num = stock_num
+        self.rebalance_freq = rebalance_freq
+        self.rebalance_days = rebalance_days
+        self.current_holdings = []  # 当前持仓
+    
+    def generate_signals(self, data: pd.DataFrame, indicators: Dict, 
+                        end_date: str = None, context: Dict = None) -> pd.Series:
+        """
+        生成交易信号（用于回测）
+        
+        Args:
+            data: 股票数据（单个股票）
+            indicators: 技术指标（单个股票）
+            end_date: 截止日期
+            context: 上下文信息（包含选股日期等）
+            
+        Returns:
+            Series: 交易信号序列
+        """
+        # 注意：ML策略是基于多股票选股的，单个股票的generate_signals不太适用
+        # 这里返回持有信号，实际的选股和调仓逻辑应该在回测引擎中处理
+        
+        signals = pd.Series(Signal.HOLD.value, index=data.index, dtype=int)
+        
+        # 如果提供了context且有选股结果，则根据持仓状态生成信号
+        if context and 'selected_stocks' in context:
+            stock_code = context.get('stock_code', '')
+            selected_stocks = context.get('selected_stocks', [])
+            
+            # 如果当前日期是调仓日
+            if context.get('is_rebalance_day', False):
+                if stock_code in selected_stocks:
+                    # 买入信号（如果未持仓）
+                    if stock_code not in self.current_holdings:
+                        signals.iloc[-1] = Signal.BUY.value
+                        self.current_holdings.append(stock_code)
+                else:
+                    # 卖出信号（如果已持仓）
+                    if stock_code in self.current_holdings:
+                        signals.iloc[-1] = Signal.SELL.value
+                        if stock_code in self.current_holdings:
+                            self.current_holdings.remove(stock_code)
+        
+        return signals
+    
+    def select_stocks_for_backtest(self, end_date: str = None) -> Tuple[List[str], List[float]]:
+        """
+        为回测选择股票（调用ML选股器）
+        
+        Args:
+            end_date: 截止日期
+            
+        Returns:
+            Tuple[List[str], List[float]]: (选中的股票列表, 对应的模型得分)
+        """
+        return self.selector.select_stocks_ml(end_date)
+    
+    def update_holdings(self, holdings: List[str]):
+        """更新当前持仓"""
+        self.current_holdings = holdings

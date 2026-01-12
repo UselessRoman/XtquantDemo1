@@ -2,8 +2,10 @@
 
 from .technical import TechnicalIndicators
 from .fundamental import FundamentalAnalyzer
+from .factor_calculator import FactorCalculator
 
 __all__ = [
     'TechnicalIndicators',
     'FundamentalAnalyzer',
+    'FactorCalculator',
 ]

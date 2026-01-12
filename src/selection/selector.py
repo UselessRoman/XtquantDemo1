@@ -18,6 +18,7 @@ from src.data.market_data import MarketDataManager
 from src.data.financial_data import FinancialDataManager
 from src.analysis.technical import TechnicalIndicators
 from src.analysis.fundamental import FundamentalAnalyzer
+from src.analysis.factor_calculator import FactorCalculator
 from src.core.utils import validate_stock_code
 
 warnings.filterwarnings('ignore')
@@ -329,3 +330,341 @@ class StockSelector:
         filepath = f'./data/{filename}'
         result_df.to_csv(filepath, index=False, encoding='utf-8-sig')
         print(f"[成功] 选股结果已保存: {filepath}")
+
+
+class MLStockSelector(StockSelector):
+    """机器学习选股器：基于47因子+ML模型的选股"""
+    
+    def __init__(self, model_path: str, stock_num: int = 7, score_threshold: float = 0.61):
+        """
+        初始化ML选股器
+        
+        Args:
+            model_path: 模型文件路径
+            stock_num: 选股数量
+            score_threshold: 得分阈值
+        """
+        super().__init__()  # 复用父类的数据管理器
+        self.factor_calculator = FactorCalculator()
+        self.model = self._load_model(model_path)
+        self.stock_num = stock_num
+        self.score_threshold = score_threshold
+        
+        # ML模型类别（必须和训练时一致）
+        self.model_classes = np.array([0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1])
+    
+    def _load_model(self, model_path: str):
+        """加载模型文件"""
+        import pickle
+        import os
+        
+        # 支持相对路径和绝对路径
+        if not os.path.isabs(model_path):
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            model_path = os.path.join(project_root, model_path)
+        
+        try:
+            with open(model_path, 'rb') as f:
+                model = pickle.load(f)
+            print(f"[成功] 模型加载成功: {model_path}")
+            return model
+        except Exception as e:
+            print(f"[错误] 模型加载失败: {e}")
+            raise
+    
+    def _get_index_stocks(self, index_code: str = None, end_date: str = None) -> List[str]:
+        """
+        获取指数成分股（中证全指）
+        
+        Args:
+            index_code: 指数代码，默认使用中证全指逻辑（通过获取所有A股实现）
+            end_date: 截止日期
+            
+        Returns:
+            List[str]: 成分股列表
+        """
+        # XTquant可能不直接支持获取指数成分股
+        # 这里使用获取所有A股的方式，后续可以优化为真正的指数成分股
+        try:
+            # 尝试获取指数成分股
+            try:
+                from xtquant import xtdata
+                # 尝试使用sector方式获取
+                stock_list = xtdata.get_stock_list_in_sector('沪深A股')
+                return [s for s in stock_list if isinstance(s, str) and (s.endswith('.SZ') or s.endswith('.SH'))]
+            except:
+                # 如果失败，使用父类方法获取所有A股
+                return self.get_a_stock_list()
+        except Exception as e:
+            print(f"[警告] 获取指数成分股失败，使用所有A股: {e}")
+            return self.get_a_stock_list()
+    
+    def _filter_st_stock(self, stock_list: List[str]) -> List[str]:
+        """过滤ST股"""
+        try:
+            from xtquant import xtdata
+            current_data = xtdata.get_market_data(['close'], stock_list, period='1d', count=1)
+            # XTquant没有直接的ST判断，这里通过股票代码和名称过滤
+            filtered = []
+            for stock in stock_list:
+                # 过滤ST股票（通常代码或名称包含ST）
+                if 'ST' not in stock and '*' not in stock:
+                    filtered.append(stock)
+            return filtered
+        except:
+            return stock_list
+    
+    def _filter_kcbj_stock(self, stock_list: List[str]) -> List[str]:
+        """过滤科创、北交、创业板股票"""
+        filtered = []
+        for stock in stock_list:
+            # 过滤科创(68开头)、北交(4、8开头)、创业板(3开头)
+            if stock[0] not in ['3', '4', '8'] and not stock.startswith('68'):
+                filtered.append(stock)
+        return filtered
+    
+    def _filter_paused_stock(self, stock_list: List[str], end_date: str = None) -> List[str]:
+        """过滤停牌股票"""
+        try:
+            # 获取最新数据，如果获取失败可能是停牌
+            filtered = []
+            for stock in stock_list:
+                try:
+                    # 尝试获取最近1天的数据
+                    if end_date:
+                        data = self.market_data_manager.get_local_data(stock, '1d', end_date, end_date)
+                    else:
+                        # 使用当前日期
+                        today = datetime.now().strftime('%Y%m%d')
+                        data = self.market_data_manager.get_local_data(stock, '1d', today, today)
+                    
+                    if data is not None and not data.empty:
+                        filtered.append(stock)
+                except:
+                    continue
+            return filtered
+        except:
+            return stock_list
+    
+    def _filter_new_stock(self, stock_list: List[str], end_date: str = None) -> List[str]:
+        """过滤次新股（上市不足375天）"""
+        if end_date is None:
+            end_date = datetime.now().strftime('%Y%m%d')
+        
+        end_dt = datetime.strptime(end_date, '%Y%m%d')
+        filtered = []
+        
+        for stock in stock_list:
+            try:
+                # 获取股票信息（需要适配XTquant API）
+                # 暂时跳过此过滤，因为XTquant可能不提供上市日期
+                filtered.append(stock)
+            except:
+                continue
+        
+        return filtered
+    
+    def _filter_limitup_stock(self, stock_list: List[str], end_date: str = None, 
+                              hold_stocks: List[str] = None) -> List[str]:
+        """过滤涨停股票（已持仓的除外）"""
+        if hold_stocks is None:
+            hold_stocks = []
+        
+        filtered = []
+        for stock in stock_list:
+            if stock in hold_stocks:
+                filtered.append(stock)
+                continue
+            
+            try:
+                # 获取最新价格
+                if end_date:
+                    data = self.market_data_manager.get_local_data(stock, '1d', end_date, end_date)
+                else:
+                    today = datetime.now().strftime('%Y%m%d')
+                    data = self.market_data_manager.get_local_data(stock, '1d', today, today)
+                
+                if data is None or data.empty:
+                    continue
+                
+                # XTquant可能不直接提供涨停价，这里需要从市场数据判断
+                # 暂时允许所有股票，后续可以优化
+                filtered.append(stock)
+            except:
+                continue
+        
+        return filtered
+    
+    def _filter_limitdown_stock(self, stock_list: List[str], end_date: str = None,
+                               hold_stocks: List[str] = None) -> List[str]:
+        """过滤跌停股票（已持仓的除外）"""
+        if hold_stocks is None:
+            hold_stocks = []
+        
+        filtered = []
+        for stock in stock_list:
+            if stock in hold_stocks:
+                filtered.append(stock)
+                continue
+            
+            try:
+                if end_date:
+                    data = self.market_data_manager.get_local_data(stock, '1d', end_date, end_date)
+                else:
+                    today = datetime.now().strftime('%Y%m%d')
+                    data = self.market_data_manager.get_local_data(stock, '1d', today, today)
+                
+                if data is None or data.empty:
+                    continue
+                
+                # 暂时允许所有股票
+                filtered.append(stock)
+            except:
+                continue
+        
+        return filtered
+    
+    def _get_fundamental_filtered(self, stock_list: List[str], end_date: str = None,
+                                  min_roe: float = 0.15, min_roa: float = 0.10) -> List[str]:
+        """
+        基本面筛选：ROE>15%, ROA>10%，按市值升序排序
+        
+        Args:
+            stock_list: 股票列表
+            end_date: 截止日期
+            min_roe: 最小ROE
+            min_roa: 最小ROA
+            
+        Returns:
+            List[str]: 筛选后的股票列表（按市值升序）
+        """
+        filtered_stocks = []
+        stock_data = []
+        
+        for stock_code in stock_list:
+            try:
+                financial_data = self.financial_data_manager.get_financial_data(stock_code, auto_download=False)
+                if not financial_data:
+                    continue
+                
+                roe = financial_data.get('roe', 0)
+                roa = financial_data.get('roa', 0)
+                market_cap = financial_data.get('market_cap', 0)
+                
+                # 基本面筛选
+                if roe and roe > min_roe and roa and roa > min_roa:
+                    stock_data.append({
+                        'stock_code': stock_code,
+                        'market_cap': market_cap if market_cap else float('inf')
+                    })
+            except:
+                continue
+        
+        # 按市值升序排序，取前stock_num只
+        stock_data.sort(key=lambda x: x['market_cap'])
+        filtered_stocks = [s['stock_code'] for s in stock_data[:self.stock_num]]
+        
+        return filtered_stocks
+    
+    def select_stocks_ml(self, end_date: str = None, index_code: str = None) -> Tuple[List[str], List[float]]:
+        """
+        ML选股主函数
+        
+        Args:
+            end_date: 截止日期，格式 'YYYYMMDD'
+            index_code: 指数代码（可选，用于获取成分股）
+            
+        Returns:
+            Tuple[List[str], List[float]]: (选中的股票列表, 对应的模型得分列表)
+        """
+        if end_date is None:
+            end_date = datetime.now().strftime('%Y%m%d')
+        
+        # 1. 获取初始股票池
+        if index_code:
+            initial_list = self._get_index_stocks(index_code, end_date)
+        else:
+            initial_list = self._get_index_stocks(end_date=end_date)
+        
+        if not initial_list:
+            print("[错误] 无法获取股票列表")
+            return [], []
+        
+        # 2. 基础过滤
+        print(f"[信息] 初始股票池: {len(initial_list)} 只")
+        filtered_list = self._filter_kcbj_stock(initial_list)  # 过滤科创/北交/创业板
+        filtered_list = self._filter_st_stock(filtered_list)  # 过滤ST股
+        print(f"[信息] 基础过滤后: {len(filtered_list)} 只")
+        
+        # 3. 基本面筛选（ROE>15%, ROA>10%，按市值排序）
+        filtered_list = self._get_fundamental_filtered(filtered_list, end_date)
+        print(f"[信息] 基本面筛选后: {len(filtered_list)} 只")
+        
+        if not filtered_list:
+            print("[错误] 基本面筛选后无股票")
+            return [], []
+        
+        # 4. 计算因子并模型预测
+        print("[信息] 开始计算因子...")
+        factor_results = {}
+        
+        for i, stock_code in enumerate(filtered_list, 1):
+            if i % 10 == 0:
+                print(f"  进度: {i}/{len(filtered_list)}")
+            
+            try:
+                factors = self.factor_calculator.calculate_all_factors(stock_code, end_date)
+                factor_results[stock_code] = factors
+            except Exception as e:
+                # print(f"[警告] {stock_code} 因子计算失败: {e}")
+                continue
+        
+        if not factor_results:
+            print("[错误] 无有效因子数据")
+            return [], []
+        
+        # 5. 构建因子DataFrame
+        factor_df = pd.DataFrame(factor_results).T
+        factor_df = factor_df[self.factor_calculator.FACTOR_LIST]  # 确保列顺序正确
+        
+        # 6. 模型预测
+        print("[信息] 模型预测中...")
+        try:
+            # 模型预测概率
+            predictions = self.model.predict_proba(factor_df.values)
+            
+            # 计算得分：概率 @ 类别向量
+            scores = predictions @ self.model_classes
+            factor_df['total_score'] = scores
+        except Exception as e:
+            print(f"[错误] 模型预测失败: {e}")
+            return [], []
+        
+        # 7. 额外过滤（停牌、涨停、跌停）
+        filtered_list_2 = self._filter_paused_stock(factor_df.index.tolist(), end_date)
+        # 注意：涨停/跌停过滤需要实时数据，这里暂时跳过
+        
+        # 更新factor_df
+        factor_df = factor_df.loc[factor_df.index.isin(filtered_list_2)]
+        
+        if factor_df.empty:
+            print(f"[信息] 过滤后无股票")
+            return [], []
+        
+        # 8. 得分过滤
+        factor_df = factor_df[factor_df['total_score'] > self.score_threshold]
+        
+        if factor_df.empty:
+            print(f"[信息] 得分阈值过滤后无股票（阈值: {self.score_threshold}）")
+            return [], []
+        
+        # 9. 按得分排序，取前stock_num只
+        factor_df = factor_df.sort_values('total_score', ascending=False)
+        selected_stocks = factor_df.head(self.stock_num).index.tolist()
+        selected_scores = factor_df.head(self.stock_num)['total_score'].tolist()
+        
+        print(f"[成功] ML选股完成，选出 {len(selected_stocks)} 只股票")
+        if selected_scores:
+            print(f"  得分范围: {min(selected_scores):.4f} - {max(selected_scores):.4f}")
+        
+        return selected_stocks, selected_scores

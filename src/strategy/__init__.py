@@ -7,7 +7,8 @@ from .strategies import (
     MAStrategy,
     KDJStrategy,
     RSIStrategy,
-    CombinedStrategy
+    CombinedStrategy,
+    MLMultiFactorStrategy
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     'KDJStrategy',
     'RSIStrategy',
     'CombinedStrategy',
+    'MLMultiFactorStrategy',
 ]

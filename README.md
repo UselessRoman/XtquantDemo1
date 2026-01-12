@@ -28,6 +28,8 @@
 - 📈 **技术分析**：MA、MACD、KDJ 等技术指标计算和图表绘制
 - 📉 **财务分析**：PE、PB、ROE 等财务指标评分
 - 🎯 **智能选股**：基于技术+财务的多维度选股
+- 🤖 **机器学习选股**：基于47因子+ML模型的多因子选股策略
+- 🛡️ **风控系统**：RSRS择时、ATR动态止损、市场宽度计算
 - 🤖 **策略回测**：完整的回测引擎和性能分析
 - 💹 **实盘交易**：异步交易、实时监控、自动交易
 - 📡 **实时监控**：订单生命周期跟踪、成交记录、统计分析
@@ -52,6 +54,9 @@ pip install -r requirements.txt
 # - xtquant（需要连接MiniQMT客户端）
 # - pandas, numpy（数据处理）
 # - matplotlib, mplfinance（图表绘制）
+# - lightgbm, scikit-learn（ML模型支持）
+# - statsmodels（RSRS计算）
+# - schedule（定时任务调度）
 # - pytest, pytest-cov（测试工具）
 ```
 
@@ -84,11 +89,13 @@ XTquantdemo1/
 │   │   └── financial_data.py     # 财务数据管理
 │   ├── analysis/                 # 分析模块
 │   │   ├── technical.py          # 技术指标分析
-│   │   └── fundamental.py        # 财务指标分析
+│   │   ├── fundamental.py        # 财务指标分析
+│   │   └── factor_calculator.py  # 多因子计算（47个因子）
 │   ├── selection/                # 选股模块
-│   │   └── selector.py           # 选股逻辑
+│   │   └── selector.py           # 选股逻辑（包含MLStockSelector）
 │   ├── strategy/                 # 策略模块
-│   │   └── strategies.py         # 交易策略（MACD、MA、KDJ等）
+│   │   ├── strategies.py         # 交易策略（MACD、MA、KDJ、MLMultiFactorStrategy等）
+│   │   └── risk_control.py       # 风控模块（RSRS、ATR、市场宽度）
 │   ├── backtest/                 # 回测模块
 │   │   ├── engine.py             # 回测引擎
 │   │   └── analyzer.py           # 性能分析器
@@ -109,6 +116,7 @@ XTquantdemo1/
 │   ├── stock_selection_example.py # 选股功能示例
 │   ├── trade_example.py          # 交易功能示例
 │   ├── async_trade_monitor_example.py # 异步交易+监控示例
+│   ├── ml_strategy_example.py    # ML多因子策略示例
 │   └── README.md                 # 示例说明文档
 ├── tests/                        # 测试代码
 ├── run_tests.py                  # 测试运行脚本
@@ -258,6 +266,8 @@ filtered = analyzer.filter_financial_data(financial_data, {
 
 ### 3. 策略模块 (`src/strategy/`)
 
+#### 3.1 传统技术策略
+
 ```python
 from src.strategy.strategies import (
     Signal, SignalGenerator,
@@ -277,6 +287,65 @@ combined = CombinedStrategy(
     strategies=[MACDStrategy(), MAStrategy(), KDJStrategy()],
     vote_threshold=2  # 至少2个策略同时发出信号
 )
+```
+
+#### 3.2 机器学习多因子策略
+
+```python
+from src.strategy.strategies import MLMultiFactorStrategy
+from src.selection.selector import MLStockSelector
+from src.trading.auto_trader import MLAutoTrader
+
+# 创建ML策略（用于回测）
+strategy = MLMultiFactorStrategy(
+    model_path='model_2024_multiclass.pkl',
+    stock_num=7,  # 持仓股票数量
+    score_threshold=0.61  # 得分阈值
+)
+
+# 执行选股
+selected_stocks, scores = strategy.select_stocks_for_backtest()
+```
+
+#### 3.3 风控模块
+
+```python
+from src.strategy.risk_control import RiskController
+
+risk_controller = RiskController()
+
+# 计算RSRS指标（个股）
+stock_rsrs = risk_controller.calculate_rsrs('600000.SH')
+
+# 计算市场RSRS（用于择时）
+market_rsrs = risk_controller.calculate_market_rsrs()
+
+# 检查市场择时（是否允许开仓）
+can_open = risk_controller.check_market_timing()  # True/False
+
+# 计算ATR止损位
+atr = risk_controller.calculate_atr('600000.SH')
+stop_loss = risk_controller.calculate_stop_loss_level('600000.SH', current_high=12.0)
+
+# 计算市场宽度
+market_breadth = risk_controller.calculate_market_breadth()  # 0-100
+```
+
+#### 3.4 多因子计算器
+
+```python
+from src.analysis.factor_calculator import FactorCalculator
+
+calculator = FactorCalculator()
+
+# 计算单个股票的所有47个因子
+factors = calculator.calculate_all_factors('600000.SH', end_date='20241231')
+# 返回: {'momentum': 2.5, 'beta': 1.2, 'sharpe_ratio_60': 0.8, ...}
+
+# 批量计算多个股票的因子
+stock_list = ['600000.SH', '000001.SZ', '000002.SZ']
+factor_df = calculator.batch_calculate_factors(stock_list, end_date='20241231')
+# 返回: DataFrame，行为股票代码，列为因子名
 ```
 
 ---
@@ -308,6 +377,8 @@ plotter.plot_performance(result, '002352.SZ')
 
 ### 5. 选股模块 (`src/selection/`)
 
+#### 5.1 传统选股
+
 ```python
 from src.selection.selector import StockSelector
 
@@ -330,6 +401,32 @@ result = selector.select_stocks(
 
 # 保存选股结果
 selector.save_selection_result(result, 'selected_stocks.csv')
+```
+
+#### 5.2 机器学习选股
+
+```python
+from src.selection.selector import MLStockSelector
+
+# 创建ML选股器
+selector = MLStockSelector(
+    model_path='model_2024_multiclass.pkl',  # 模型文件路径
+    stock_num=7,  # 选股数量
+    score_threshold=0.61  # 得分阈值
+)
+
+# 执行ML选股
+selected_stocks, scores = selector.select_stocks_ml(end_date='20241231')
+# 返回: (['600000.SH', '000001.SZ', ...], [1.25, 1.18, ...])
+
+# 选股流程：
+# 1. 获取指数成分股（中证全指或A股）
+# 2. 基础过滤（ST、科创/北交/创业板、停牌）
+# 3. 基本面筛选（ROE>15%, ROA>10%，按市值排序）
+# 4. 计算47个因子
+# 5. ML模型预测得分
+# 6. 得分过滤（>0.61）和排序
+# 7. 返回前N只股票
 ```
 
 ---
@@ -409,13 +506,12 @@ dataframes = monitor.export_to_dataframe()
 #### 6.4 自动交易
 
 ```python
-from src.trading.auto_trader import AutoTrader
+from src.trading.auto_trader import AutoTrader, MLAutoTrader
 from src.strategy.strategies import MACDStrategy
+from src.selection.selector import MLStockSelector
 
-# 创建自动交易器
+# 传统策略自动交易
 auto_trader = AutoTrader(trader=trader)
-
-# 运行策略并自动执行交易
 strategy = MACDStrategy()
 result = auto_trader.run_strategy(
     stock_code='002352.SZ',
@@ -426,7 +522,49 @@ result = auto_trader.run_strategy(
 # 返回: {'success': True, 'signal': 1, 'async_seq': 12345}
 ```
 
-#### 6.5 交易接口说明：同步、异步和回调
+#### 6.5 ML策略自动交易（完整自动交易策略）
+
+```python
+from src.trading.auto_trader import MLAutoTrader
+from src.selection.selector import MLStockSelector
+from src.trading.trader import Trader
+
+# 创建ML自动交易器
+selector = MLStockSelector(model_path='model_2024_multiclass.pkl', stock_num=7)
+ml_trader = MLAutoTrader(trader=trader, selector=selector, stock_num=7)
+
+# 连接交易接口
+ml_trader.connect()
+
+# 1. ML选股
+selected_stocks, scores = selector.select_stocks_ml()
+
+# 2. 执行调仓（自动卖出不在目标列表的股票，买入新股票）
+result = ml_trader.rebalance_portfolio(selected_stocks, scores)
+
+# 3. 风控检查（ATR止损、RSRS风控，触发后自动再投资）
+triggered_stocks, cash_released = ml_trader.check_risk_control()
+
+# 4. 处理涨停股票（涨停打开则卖出并再投资）
+sold_stocks, cash = ml_trader.handle_limit_up_stocks()
+
+# 5. 更新涨停股票列表
+ml_trader.update_limit_up_list()
+
+# 6. 检查市场择时（市场弱势时禁止开仓）
+can_trade = ml_trader.check_market_timing()
+```
+
+**ML策略特性**：
+- ✅ **47因子计算**：动量、波动率、技术指标、基本面等47个量化因子
+- ✅ **ML模型预测**：基于LightGBM多分类模型的得分预测
+- ✅ **动态调仓**：每月1日和15日自动调仓，按模型得分分配资金
+- ✅ **风控系统**：RSRS择时、ATR动态止损、市场宽度监控
+- ✅ **涨停处理**：昨日涨停股票持有，涨停打开则卖出并再投资
+- ✅ **自动再投资**：风控触发或涨停打开释放的资金立即再投资
+- ✅ **市场择时**：市场宽度<45或RSRS<-0.9时禁止开仓/清仓
+
+#### 6.6 交易接口说明：同步、异步和回调
 
 **同步（Synchronous）下单**：
 - ⏱️ **阻塞式**：调用后程序暂停，等待结果
@@ -460,7 +598,7 @@ result = auto_trader.run_strategy(
 | 性能 | 较慢（需等待） | 快（不等待） | 实时响应 |
 | 适用场景 | 单笔交易 | 批量交易、高频 | 实时监控 |
 
-#### 6.6 自定义回调
+#### 6.7 自定义回调
 
 ```python
 # 注册自定义回调函数
@@ -556,6 +694,49 @@ for idx, row in selected_stocks.iterrows():
     framework.run_auto_trading(stock_code, strategy, lookback_days=100)
 ```
 
+#### 示例4：ML多因子策略完整工作流程
+
+```python
+from src.selection.selector import MLStockSelector
+from src.trading.auto_trader import MLAutoTrader
+from src.trading.trader import Trader
+from src.trading.trade_monitor import TradeMonitor
+
+# 1. 创建交易接口和监控器
+trader = Trader(qmt_path='...', account_id='...')
+trader.connect()
+monitor = TradeMonitor()
+trader.trader.register_callback(monitor)
+
+# 2. 创建ML选股器和自动交易器
+selector = MLStockSelector(
+    model_path='model_2024_multiclass.pkl',
+    stock_num=7,
+    score_threshold=0.61
+)
+ml_trader = MLAutoTrader(trader=trader, selector=selector, stock_num=7)
+ml_trader.connect()
+
+# 3. ML选股
+selected_stocks, scores = selector.select_stocks_ml()
+
+# 4. 检查市场择时
+if ml_trader.check_market_timing():
+    # 5. 执行调仓
+    result = ml_trader.rebalance_portfolio(selected_stocks, scores)
+    
+    # 6. 更新涨停股票列表
+    ml_trader.update_limit_up_list()
+    
+    # 7. 定时风控检查（ATR止损、RSRS风控）
+    triggered_stocks, cash = ml_trader.check_risk_control()
+    
+    # 8. 处理涨停股票（涨停打开卖出并再投资）
+    sold_stocks, cash = ml_trader.handle_limit_up_stocks()
+else:
+    print("市场弱势，禁止开仓")
+```
+
 ### 示例文件说明
 
 查看 `examples/` 目录获取更多详细示例：
@@ -568,6 +749,7 @@ for idx, row in selected_stocks.iterrows():
 - **`stock_selection_example.py`** - 选股功能示例
 - **`trade_example.py`** - 交易功能示例
 - **`async_trade_monitor_example.py`** - 异步交易+实时监控示例
+- **`ml_strategy_example.py`** - ML多因子策略完整示例（选股+调仓+风控+实盘交易）
 
 **运行示例**：
 ```bash
@@ -958,6 +1140,37 @@ git checkout main
 
 ## 📜 版本历史
 
+### v3.0.0 (2026-01-12)
+
+#### 重大更新
+- ✅ **机器学习多因子策略**：完整适配聚宽ML策略到XTquant框架
+- ✅ **47因子计算器**：实现完整的47个量化因子计算（动量、波动率、技术、基本面等）
+- ✅ **风控系统**：RSRS择时、ATR动态止损、市场宽度计算
+- ✅ **ML自动交易器**：集成选股、调仓、风控、再投资的完整自动交易系统
+
+#### 新增功能
+- ✅ `FactorCalculator`：47个因子计算模块
+- ✅ `RiskController`：风控控制器（RSRS、ATR、市场宽度）
+- ✅ `MLStockSelector`：基于ML模型的智能选股器
+- ✅ `MLAutoTrader`：ML策略自动交易器（调仓、风控、再投资）
+- ✅ `MLMultiFactorStrategy`：ML多因子策略类（用于回测）
+
+#### 策略特性
+- ✅ **47因子完整实现**：动量、Beta、Sharpe、波动率、偏度、峰度、技术指标、基本面等
+- ✅ **ML模型支持**：LightGBM多分类模型，8类概率预测
+- ✅ **动态调仓**：每月1日和15日调仓，按模型得分分配资金
+- ✅ **风控系统**：
+  - RSRS择时（个股<-0.7卖出，市场<-0.9禁止开仓）
+  - ATR动态跟踪止损（最高价-2*ATR）
+  - 市场宽度监控（<45清仓）
+- ✅ **涨停处理**：昨日涨停股票持有，涨停打开卖出并再投资
+- ✅ **自动再投资**：风控触发或涨停打开释放的资金立即再投资候选股
+
+#### 改进
+- ✅ 优化因子计算性能（批量计算支持）
+- ✅ 完善风控逻辑（触发后立即再投资）
+- ✅ 改进选股流程（基本面筛选+因子计算+ML预测）
+
 ### v2.0.0 (2026-01-07)
 
 #### 重大更新
@@ -1042,5 +1255,5 @@ git checkout main
 
 ---
 
-**版本**: 2.0.0  
-**最后更新**: 2026-01-07
+**版本**: 3.0.0  
+**最后更新**: 2026-01-12
