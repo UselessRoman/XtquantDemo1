@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 import warnings
 import sys
 import os
+import pickle
+# 延迟导入lightgbm，避免在模块加载时失败
+# import lightgbm 
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.data.market_data import MarketDataManager
@@ -357,6 +360,39 @@ class MLStockSelector(StockSelector):
         """加载模型文件"""
         import pickle
         import os
+        import sys
+        
+        # 检查必要的依赖
+        try:
+            import lightgbm
+        except ImportError as e:
+            # 检测当前Python环境
+            in_venv = hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
+            
+            # 构建错误提示信息
+            if in_venv:
+                error_msg = (
+                    f"[错误] 缺少必要的依赖库: lightgbm\n"
+                    f"\n检测到您正在使用虚拟环境: {sys.prefix}\n"
+                    f"请在虚拟环境中安装依赖，运行以下命令之一：\n"
+                    f"  方式1: {sys.executable} -m pip install -r requirements.txt\n"
+                    f"  方式2: pip install -r requirements.txt  （确保虚拟环境已激活）\n"
+                    f"  方式3: pip install lightgbm>=3.3.0 scikit-learn>=1.0.0 statsmodels>=0.13.0 schedule>=1.2.0\n"
+                    f"\n如果不想使用虚拟环境，请在IDE中切换到系统Python解释器\n"
+                    f"原始错误: {e}"
+                )
+            else:
+                error_msg = (
+                    f"[错误] 缺少必要的依赖库: lightgbm\n"
+                    f"当前Python: {sys.executable}\n"
+                    f"请运行以下命令安装依赖：\n"
+                    f"  pip install -r requirements.txt\n"
+                    f"或单独安装：\n"
+                    f"  pip install lightgbm>=3.3.0 scikit-learn>=1.0.0 statsmodels>=0.13.0 schedule>=1.2.0\n"
+                    f"原始错误: {e}"
+                )
+            print(error_msg)
+            raise ImportError(error_msg) from e
         
         # 支持相对路径和绝对路径
         if not os.path.isabs(model_path):
@@ -368,6 +404,15 @@ class MLStockSelector(StockSelector):
                 model = pickle.load(f)
             print(f"[成功] 模型加载成功: {model_path}")
             return model
+        except ModuleNotFoundError as e:
+            error_msg = (
+                f"[错误] 模型加载失败：缺少依赖模块\n"
+                f"错误详情: {e}\n"
+                f"请运行以下命令安装所有依赖：\n"
+                f"  pip install -r requirements.txt\n"
+            )
+            print(error_msg)
+            raise ImportError(error_msg) from e
         except Exception as e:
             print(f"[错误] 模型加载失败: {e}")
             raise
@@ -540,11 +585,18 @@ class MLStockSelector(StockSelector):
         """
         filtered_stocks = []
         stock_data = []
+        checked_count = 0
+        passed_count = 0
+        no_data_count = 0
+        
+        print(f"[信息] 开始基本面筛选（ROE>{min_roe*100}%, ROA>{min_roa*100}%），股票数量: {len(stock_list)}")
         
         for stock_code in stock_list:
+            checked_count += 1
             try:
                 financial_data = self.financial_data_manager.get_financial_data(stock_code, auto_download=False)
                 if not financial_data:
+                    no_data_count += 1
                     continue
                 
                 roe = financial_data.get('roe', 0)
@@ -553,16 +605,34 @@ class MLStockSelector(StockSelector):
                 
                 # 基本面筛选
                 if roe and roe > min_roe and roa and roa > min_roa:
+                    passed_count += 1
                     stock_data.append({
                         'stock_code': stock_code,
-                        'market_cap': market_cap if market_cap else float('inf')
+                        'market_cap': market_cap if market_cap else float('inf'),
+                        'roe': roe,
+                        'roa': roa
                     })
-            except:
+            except Exception as e:
                 continue
+            
+            # 每100只股票打印一次进度
+            if checked_count % 100 == 0:
+                print(f"  进度: {checked_count}/{len(stock_list)}, 通过: {passed_count}, 无数据: {no_data_count}")
+        
+        print(f"[信息] 基本面筛选完成: 检查{checked_count}只，通过{passed_count}只，无数据{no_data_count}只")
+        
+        # 如果通过筛选的股票太少，放宽条件
+        if len(stock_data) < self.stock_num:
+            print(f"[警告] 通过筛选的股票数量({len(stock_data)})少于目标数量({self.stock_num})")
+            print(f"[提示] 建议降低筛选标准（当前: ROE>{min_roe*100}%, ROA>{min_roa*100}%）")
+            # 可以在这里实现自动放宽条件的逻辑，暂时返回所有通过的股票
         
         # 按市值升序排序，取前stock_num只
         stock_data.sort(key=lambda x: x['market_cap'])
         filtered_stocks = [s['stock_code'] for s in stock_data[:self.stock_num]]
+        
+        if filtered_stocks:
+            print(f"[信息] 最终选出 {len(filtered_stocks)} 只股票（按市值排序）")
         
         return filtered_stocks
     
