@@ -63,15 +63,24 @@ class TraderCallback(XtQuantTraderCallback):
         """成交变动推送"""
         trade_info = {
             'trade_id': getattr(trade, 'trade_id', ''),
-            'order_id': getattr(trade, 'order_id', ''),
+            'order_id': getattr(trade, 'order_id', 0),
             'stock_code': getattr(trade, 'stock_code', ''),
             'order_remark': getattr(trade, 'order_remark', ''),
-            'offset_flag': getattr(trade, 'offset_flag', ''),  # 48买 49卖
-            'traded_price': getattr(trade, 'traded_price', 0),
+            'offset_flag': getattr(trade, 'offset_flag', 0),  # OFFSET_FLAG_OPEN=48(买入), OFFSET_FLAG_CLOSE=49(卖出)
+            'traded_price': getattr(trade, 'traded_price', 0.0),
             'traded_volume': getattr(trade, 'traded_volume', 0),
-            'traded_time': getattr(trade, 'traded_time', ''),
+            'traded_time': getattr(trade, 'traded_time', 0),
+            'traded_amount': getattr(trade, 'traded_amount', 0.0),  # 成交金额
         }
-        direction = '买入' if trade_info['offset_flag'] == 48 else '卖出'
+        # 根据官方文档，使用 xtconstant 中的交易操作常量
+        # OFFSET_FLAG_OPEN (48) = 买入/开仓，OFFSET_FLAG_CLOSE (49) = 卖出/平仓
+        offset_flag = trade_info['offset_flag']
+        if offset_flag == xtconstant.OFFSET_FLAG_OPEN:
+            direction = '买入'
+        elif offset_flag == xtconstant.OFFSET_FLAG_CLOSE:
+            direction = '卖出'
+        else:
+            direction = '其他'
         print(f"[回调] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 成交回报: {trade_info['order_remark']} "
               f"{direction} 价格 {trade_info['traded_price']} 数量 {trade_info['traded_volume']}")
         for callback in self.trade_callbacks:
@@ -211,12 +220,28 @@ class Trader:
             account_info = self.trader.query_stock_asset(self.account)
             
             if account_info:
+                # 根据官方文档，XtAsset 的属性为：
+                # cash (float) - 可用金额
+                # frozen_cash (float) - 冻结金额
+                # market_value (float) - 持仓市值
+                # total_asset (float) - 总资产
+                # 使用 getattr 安全获取属性（兼容不同版本）
+                total_asset = getattr(account_info, 'total_asset', 0)
+                cash = getattr(account_info, 'cash', 0)
+                frozen_cash = getattr(account_info, 'frozen_cash', 0)
+                market_value = getattr(account_info, 'market_value', 0)
+                
+                # 总盈亏 = 总资产 - 初始资金（这里简化为总资产 - 可用资金 - 持仓市值）
+                # 实际上盈亏应该通过持仓来计算，这里只做简单估算
+                profit = total_asset - cash - market_value
+                
                 result = {
                     'account_id': self.account_id,
-                    '总资产': account_info.m_dBalance,  # 总资产
-                    '可用资金': account_info.m_dCash,  # 可用资金
-                    '持仓市值': account_info.m_dMarketValue,  # 持仓市值
-                    '总盈亏': account_info.m_dProfit,  # 总盈亏
+                    '总资产': total_asset,
+                    '可用资金': cash,
+                    '冻结资金': frozen_cash,
+                    '持仓市值': market_value,
+                    '总盈亏': profit,
                 }
                 
                 print("\n账户信息:")
@@ -255,17 +280,38 @@ class Trader:
             positions = self.trader.query_stock_positions(self.account)
             
             if positions:
+                # 根据官方文档，XtPosition 的属性为：
+                # volume (int) - 持仓数量
+                # can_use_volume (int) - 可用数量
+                # open_price (float) - 开仓价（返回与成本价一致）
+                # market_value (float) - 市值
+                # avg_price (float) - 成本价
+                # frozen_volume (int) - 冻结数量
                 # 转换为DataFrame
                 position_list = []
                 for pos in positions:
+                    # 使用 getattr 安全获取属性
+                    volume = getattr(pos, 'volume', 0)
+                    can_use_volume = getattr(pos, 'can_use_volume', 0)
+                    frozen_volume = getattr(pos, 'frozen_volume', 0)
+                    avg_price = getattr(pos, 'avg_price', 0)
+                    open_price = getattr(pos, 'open_price', avg_price)  # 开仓价，如果没有则用成本价
+                    market_value = getattr(pos, 'market_value', 0)
+                    stock_code = getattr(pos, 'stock_code', '')
+                    
+                    # 计算盈亏 = 市值 - 成本
+                    cost = volume * avg_price
+                    profit = market_value - cost
+                    
                     position_dict = {
-                        'stock_code': pos.stock_code,
-                        '股票代码': pos.stock_code,
-                        '总持仓': pos.m_nVolume,  # 总持仓（股）
-                        '可用持仓': pos.m_nCanUseVolume,  # 可用持仓（股）
-                        '持仓成本': pos.m_dCost,  # 持仓成本
-                        '最新价': pos.m_dPrice,  # 最新价
-                        '盈亏': pos.m_dProfit,  # 盈亏
+                        '股票代码': stock_code,
+                        '总持仓(股)': volume,
+                        '可用(股)': can_use_volume,
+                        '冻结(股)': frozen_volume,
+                        '成本价': avg_price,
+                        '开仓价': open_price,
+                        '市值(元)': market_value,
+                        '盈亏(元)': profit,
                     }
                     position_list.append(position_dict)
                 
@@ -273,10 +319,59 @@ class Trader:
                 
                 if not df.empty:
                     print("\n持仓信息:")
-                    print("=" * 60)
-                    print(df.to_string(index=False))
-                    print("=" * 60)
-                    return df
+                    print("=" * 100)
+                    # 手动格式化输出，确保对齐
+                    # 定义列宽
+                    widths = {
+                        '股票代码': 12,
+                        '总持仓(股)': 12,
+                        '可用(股)': 12,
+                        '冻结(股)': 12,
+                        '成本价': 10,
+                        '开仓价': 10,
+                        '市值(元)': 15,
+                        '盈亏(元)': 15,
+                    }
+                    
+                    # 格式化标题行
+                    header = (
+                        f"{'股票代码':<{widths['股票代码']}}"
+                        f"{'总持仓(股)':>{widths['总持仓(股)']}}"
+                        f"{'可用(股)':>{widths['可用(股)']}}"
+                        f"{'冻结(股)':>{widths['冻结(股)']}}"
+                        f"{'成本价':>{widths['成本价']}}"
+                        f"{'开仓价':>{widths['开仓价']}}"
+                        f"{'市值(元)':>{widths['市值(元)']}}"
+                        f"{'盈亏(元)':>{widths['盈亏(元)']}}"
+                    )
+                    print(header)
+                    print("-" * 100)
+                    
+                    # 格式化数据行
+                    for _, row in df.iterrows():
+                        stock_code = str(row['股票代码'])
+                        volume = int(row['总持仓(股)'])
+                        can_use = int(row['可用(股)'])
+                        frozen = int(row['冻结(股)'])
+                        cost_price = f"{row['成本价']:.2f}"
+                        open_price = f"{row['开仓价']:.2f}"
+                        market_value = f"{row['市值(元)']:,.2f}"
+                        profit = f"{row['盈亏(元)']:,.2f}"
+                        
+                        line = (
+                            f"{stock_code:<{widths['股票代码']}}"
+                            f"{volume:>{widths['总持仓(股)']}}"
+                            f"{can_use:>{widths['可用(股)']}}"
+                            f"{frozen:>{widths['冻结(股)']}}"
+                            f"{cost_price:>{widths['成本价']}}"
+                            f"{open_price:>{widths['开仓价']}}"
+                            f"{market_value:>{widths['市值(元)']}}"
+                            f"{profit:>{widths['盈亏(元)']}}"
+                        )
+                        print(line)
+                    
+                    print("=" * 100)
+                    return df  # 返回原始 DataFrame，包含原始数值类型
                 else:
                     print("当前无持仓")
                     return pd.DataFrame()
@@ -334,7 +429,7 @@ class Trader:
                         print("[错误] 无法获取账户信息")
                         return None
                     
-                    available_cash = account_info.m_dCash
+                    available_cash = getattr(account_info, 'cash', 0)
                     
                     # 获取最新价
                     full_tick = xtdata.get_full_tick([stock_code])
@@ -562,14 +657,24 @@ class Trader:
                 # 转换为DataFrame
                 order_list = []
                 for order in orders:
+                    # 根据官方文档，XtOrder 的属性为：
+                    # order_id (int) - 订单编号
+                    # stock_code (str) - 证券代码
+                    # order_status (int) - 委托状态
+                    # price (float) - 委托价格
+                    # order_volume (int) - 委托数量
+                    # traded_volume (int) - 成交数量
+                    # traded_price (float) - 成交均价
+                    # order_time (int) - 报单时间
                     order_dict = {
-                        'order_id': getattr(order, 'order_id', ''),
+                        'order_id': getattr(order, 'order_id', 0),
                         'stock_code': getattr(order, 'stock_code', ''),
-                        'order_status': getattr(order, 'order_status', ''),
-                        'price': getattr(order, 'price', 0),
-                        'volume': getattr(order, 'volume', 0),
+                        'order_status': getattr(order, 'order_status', 0),
+                        'price': getattr(order, 'price', 0.0),
+                        'volume': getattr(order, 'order_volume', 0),  # 委托数量
                         'traded_volume': getattr(order, 'traded_volume', 0),
-                        'order_time': getattr(order, 'order_time', ''),
+                        'traded_price': getattr(order, 'traded_price', 0.0),
+                        'order_time': getattr(order, 'order_time', 0),
                         'order_remark': getattr(order, 'order_remark', ''),
                     }
                     order_list.append(order_dict)
@@ -579,9 +684,13 @@ class Trader:
                 if not df.empty:
                     # 如果只查询可撤单的，过滤状态
                     if cancelable_only:
-                        # 可撤单状态：已报(2)、部成(3)
+                        # 可撤单状态：已报(ORDER_REPORTED)、部成待撤(ORDER_PARTSUCC_CANCEL)
                         if 'order_status' in df.columns:
-                            df = df[df['order_status'].isin([2, 3])]
+                            # 只查询可撤单的状态：已报、部成待撤
+                            df = df[df['order_status'].isin([
+                                xtconstant.ORDER_REPORTED,           # 50: 已报
+                                xtconstant.ORDER_PARTSUCC_CANCEL     # 52: 部成待撤
+                            ])]
                     
                     print("\n委托记录:")
                     print("=" * 60)
@@ -618,14 +727,33 @@ class Trader:
                 # 转换为DataFrame
                 trade_list = []
                 for trade in trades:
+                    # 根据官方文档，XtTrade 的属性为：
+                    # order_id (int) - 订单编号
+                    # stock_code (str) - 证券代码
+                    # traded_price (float) - 成交均价
+                    # traded_volume (int) - 成交数量
+                    # traded_amount (float) - 成交金额
+                    # traded_time (int) - 成交时间
+                    # offset_flag (int) - 交易操作
+                    offset_flag = getattr(trade, 'offset_flag', 0)
+                    # 根据官方文档，使用 xtconstant 中的交易操作常量
+                    if offset_flag == xtconstant.OFFSET_FLAG_OPEN:
+                        direction = '买入'
+                    elif offset_flag == xtconstant.OFFSET_FLAG_CLOSE:
+                        direction = '卖出'
+                    else:
+                        direction = '其他'
+                    
                     trade_dict = {
-                        'trade_id': getattr(trade, 'trade_id', ''),
-                        'order_id': getattr(trade, 'order_id', ''),
+                        'trade_id': getattr(trade, 'traded_id', ''),  # 成交编号
+                        'order_id': getattr(trade, 'order_id', 0),
                         'stock_code': getattr(trade, 'stock_code', ''),
-                        'offset_flag': getattr(trade, 'offset_flag', ''),  # 48买 49卖
-                        'traded_price': getattr(trade, 'traded_price', 0),
+                        'offset_flag': offset_flag,  # OFFSET_FLAG_OPEN=48(买入), OFFSET_FLAG_CLOSE=49(卖出)
+                        'direction': direction,
+                        'traded_price': getattr(trade, 'traded_price', 0.0),
                         'traded_volume': getattr(trade, 'traded_volume', 0),
-                        'traded_time': getattr(trade, 'traded_time', ''),
+                        'traded_amount': getattr(trade, 'traded_amount', 0.0),
+                        'traded_time': getattr(trade, 'traded_time', 0),
                         'order_remark': getattr(trade, 'order_remark', ''),
                     }
                     trade_list.append(trade_dict)

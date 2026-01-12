@@ -6,7 +6,8 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.analysis.technical import TechnicalIndicators, ChartPlotter
+from src.analysis.technical import TechnicalIndicators
+from src.visualization.chart import ChartPlotter
 
 
 class TestTechnicalIndicators:

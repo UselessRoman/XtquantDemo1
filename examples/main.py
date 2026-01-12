@@ -15,7 +15,9 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from src.data.market_data import MarketDataManager
-from src.analysis.technical import TechnicalIndicators, ChartPlotter
+from src.analysis.technical import TechnicalIndicators
+from src.visualization.chart import ChartPlotter
+from src.visualization.performance import PerformancePlotter
 from src.strategy.strategies import MACDStrategy, MAStrategy, KDJStrategy, CombinedStrategy
 from src.backtest.engine import BacktestEngine
 from src.backtest.analyzer import PerformanceAnalyzer
@@ -44,6 +46,7 @@ class QuantFramework:
         self.data_manager = MarketDataManager()
         self.indicator_calculator = TechnicalIndicators()
         self.chart_plotter = ChartPlotter()
+        self.performance_plotter = PerformancePlotter()
         self.backtest_engine = BacktestEngine()
         self.performance_analyzer = PerformanceAnalyzer()
         
@@ -206,7 +209,7 @@ class QuantFramework:
         
         # 绘制图表
         print("\n绘制回测图表...")
-        fig, axes = self.performance_analyzer.plot_performance(backtest_result, stock_id)
+        fig, axes = self.performance_plotter.plot_performance(backtest_result, stock_id)
         
         # 保存图表
         if save_chart:

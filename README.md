@@ -218,7 +218,8 @@ data = manager.get_financial_data('600000.SH', auto_download=False)
 #### 2.1 技术指标分析
 
 ```python
-from src.analysis.technical import TechnicalIndicators, ChartPlotter
+from src.analysis.technical import TechnicalIndicators
+from src.visualization.chart import ChartPlotter
 
 calculator = TechnicalIndicators()
 
@@ -298,7 +299,9 @@ performance = analyzer.analyze(result)
 # 返回: {'总收益率': '15.5%', '年化收益率': '12.3%', '夏普比率': 1.2, ...}
 
 # 绘制收益曲线
-analyzer.plot_equity_curve(result)
+from src.visualization.performance import PerformancePlotter
+plotter = PerformancePlotter()
+plotter.plot_performance(result, '002352.SZ')
 ```
 
 ---

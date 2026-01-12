@@ -28,14 +28,14 @@ def example_1_async_with_monitor():
     # 创建交易接口
     trader = Trader(qmt_path=qmt_path, account_id=account_id)
     
-    # 创建并注册监控器
-    monitor = TradeMonitor()
-    trader.trader.register_callback(monitor)
-    
-    # 连接
+    # 先连接交易接口（trader.trader 在 connect() 中初始化）
     if not trader.connect():
         print("[错误] 连接失败")
         return
+    
+    # 创建并注册监控器（必须在 connect() 之后）
+    monitor = TradeMonitor()
+    trader.trader.register_callback(monitor)
     
     print("\n" + "-" * 60)
     print("步骤1：查询账户和持仓")
@@ -52,7 +52,7 @@ def example_1_async_with_monitor():
     print("-" * 60)
     
     # 异步买入（默认async_mode=True）
-    stock_code = '600000.SH'
+    stock_code = '001208.SZ'
     seq1 = trader.buy(stock_code, target_amount=10000)  # 买入1万元
     
     if seq1:
@@ -89,12 +89,13 @@ def example_2_custom_callback():
     
     trader = Trader(qmt_path=qmt_path, account_id=account_id)
     
-    # 创建监控器
-    monitor = TradeMonitor()
-    trader.trader.register_callback(monitor)
-    
+    # 先连接交易接口
     if not trader.connect():
         return
+    
+    # 创建并注册监控器（必须在 connect() 之后）
+    monitor = TradeMonitor()
+    trader.trader.register_callback(monitor)
     
     # 定义自定义回调函数
     def on_my_order_confirmed(data):
@@ -136,12 +137,13 @@ def example_3_batch_async_trade():
     
     trader = Trader(qmt_path=qmt_path, account_id=account_id)
     
-    # 创建监控器
-    monitor = TradeMonitor()
-    trader.trader.register_callback(monitor)
-    
+    # 先连接交易接口
     if not trader.connect():
         return
+    
+    # 创建并注册监控器（必须在 connect() 之后）
+    monitor = TradeMonitor()
+    trader.trader.register_callback(monitor)
     
     # 批量买入多只股票
     stocks = [
@@ -183,7 +185,7 @@ if __name__ == "__main__":
     print("=" * 60)
     
     # 运行示例（根据需要取消注释）
-    # example_1_async_with_monitor()
+    example_1_async_with_monitor()
     # example_2_custom_callback()
     # example_3_batch_async_trade()
     

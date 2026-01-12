@@ -13,7 +13,8 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from examples.main import QuantFramework
-from src.analysis.technical import TechnicalIndicators, ChartPlotter
+from src.analysis.technical import TechnicalIndicators
+from src.visualization.chart import ChartPlotter
 from src.analysis.fundamental import FundamentalAnalyzer
 from src.data.market_data import MarketDataManager
 from src.data.financial_data import FinancialDataManager

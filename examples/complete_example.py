@@ -17,7 +17,8 @@ if _project_root not in sys.path:
 from examples.main import QuantFramework
 from src.data.market_data import MarketDataManager
 from src.data.financial_data import FinancialDataManager
-from src.analysis.technical import TechnicalIndicators, ChartPlotter
+from src.analysis.technical import TechnicalIndicators
+from src.visualization.chart import ChartPlotter
 from src.analysis.fundamental import FundamentalAnalyzer
 from src.strategy.strategies import MACDStrategy, MAStrategy, KDJStrategy, RSIStrategy, CombinedStrategy
 from src.backtest.engine import BacktestEngine
